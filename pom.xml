@@ -110,7 +110,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>Main2</mainClass>
+                            <mainClass>Main</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>
