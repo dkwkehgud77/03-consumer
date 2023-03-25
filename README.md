@@ -14,3 +14,5 @@ mvn exec:java
 # java -jar infra-1.0-SNAPSHOT-jar
 ```
 
+
+pkill -9 -f /Users/dohyung/ailab/realtime-pipeline

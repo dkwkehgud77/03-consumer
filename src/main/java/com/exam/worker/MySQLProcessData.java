@@ -1,5 +1,8 @@
 package com.exam.worker;
 
+import org.apache.avro.Schema;
+import org.apache.avro.generic.GenericData;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.slf4j.Logger;
@@ -7,8 +10,10 @@ import org.slf4j.LoggerFactory;
 
 import java.sql.*;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.ResourceBundle;
+import java.util.stream.Collectors;
 
 class MySQLProcessData {
 
@@ -38,12 +43,13 @@ class MySQLProcessData {
         }
     }
 
-    public Map<TopicPartition, OffsetAndMetadata> readOffsetsFromDB(Connection conn, String topicName, int partitionId){
+    public Map<TopicPartition, OffsetAndMetadata> readOffsetsFromDB(Connection conn, String topicName, int partitionId, String consumerGroupId){
         Map<TopicPartition, OffsetAndMetadata> offsets = new HashMap<>();
 
         // DB에서 저장된 offset 정보를 읽어온다.
         try {
-            String query = String.format("SELECT * FROM kafka_offsets where topic='%s' and `partition`=%s",topicName, partitionId);
+            String query = String.format("SELECT * FROM kafka_offsets " +
+                            "where topic='%s' and `partition`=%d and consumer_group='%s'" ,topicName, partitionId, consumerGroupId);
             System.out.println(query);
             PreparedStatement stmt = conn.prepareStatement(query);
             ResultSet rs = stmt.executeQuery();
@@ -51,6 +57,7 @@ class MySQLProcessData {
             while (rs.next()) {
                 String topic = rs.getString("topic");
                 int partition = rs.getInt("partition");
+                String consumer_group = rs.getString("consumer_group");
                 long offset = rs.getLong("offset");
                 offsets.put(new TopicPartition(topic, partition), new OffsetAndMetadata(offset));
             }
@@ -60,33 +67,70 @@ class MySQLProcessData {
         return offsets;
     }
 
-    public void saveOffsetToDB(Connection conn, Map<TopicPartition, OffsetAndMetadata> offsets) {
-        try {
-
-            String sql = "INSERT INTO kafka_offsets (offset, topic, `partition`)\n" +
-                    "VALUES (?, ?, ?)\n" +
-                    "ON DUPLICATE KEY UPDATE\n" +
-                    "    offset = ?,\n" +
-                    "    topic = ?,\n" +
-                    "    `partition` = ?";
+    public void saveOffsetToDB(Connection conn, Map<TopicPartition, OffsetAndMetadata> offsets, String consumerGroupId) throws SQLException {
+        String sql = "INSERT INTO kafka_offsets (offset, topic, `partition`, consumer_group)\n" +
+                "VALUES (?, ?, ?, ?)\n" +
+                "ON DUPLICATE KEY UPDATE\n" +
+                "    offset = ?,\n" +
+                "    topic = ?,\n" +
+                "    `partition` = ?,\n" +
+                "    consumer_group = ?";
 //            String sql = "UPDATE kafka_offsets SET offset = ? WHERE topic = ? AND `partition` = ?";
-            PreparedStatement stmt = conn.prepareStatement(sql);
-            for (Map.Entry<TopicPartition, OffsetAndMetadata> entry : offsets.entrySet()) {
-                TopicPartition tp = entry.getKey();
-                long offset = entry.getValue().offset();
-                stmt.setLong(1, offset);
-                stmt.setString(2, tp.topic());
-                stmt.setInt(3, tp.partition());
-                stmt.setLong(4, offset);
-                stmt.setString(5, tp.topic());
-                stmt.setInt(6, tp.partition());
-                stmt.executeUpdate();
 
-                logger.info(String.format("offsets updated successfuly... topic:%s partition:%d",tp.topic(), tp.partition()));
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
+        PreparedStatement stmt = conn.prepareStatement(sql);
+        for (Map.Entry<TopicPartition, OffsetAndMetadata> entry : offsets.entrySet()) {
+            TopicPartition tp = entry.getKey();
+            long offset = entry.getValue().offset();
+            stmt.setLong(1, offset);
+            stmt.setString(2, tp.topic());
+            stmt.setInt(3, tp.partition());
+            stmt.setString(4, consumerGroupId);
+            stmt.setLong(5, offset);
+            stmt.setString(6, tp.topic());
+            stmt.setInt(7, tp.partition());
+            stmt.setString(8, consumerGroupId);
+
+            logger.info(String.format("offsets updated successfuly... topic:%s partition:%d",tp.topic(), tp.partition()));
+            stmt.executeUpdate();
         }
+
+    }
+
+    public int insertRecordToDB(Connection conn, ConsumerRecord<String, GenericData.Record> record) throws SQLException {
+        GenericData.Record recordValue =  record.value();
+        Schema schema = recordValue.getSchema();
+        String tableName = record.topic();
+
+        // 필드 이름을 추출하고 문자열 리스트로 변환 ->  ',' 로 이어 스트링으로 만듭니다.
+        List<Schema.Field> fields = schema.getFields();
+
+        List<String> fieldNames = fields.stream()
+                .map(Schema.Field::name)
+                .collect(Collectors.toList());
+        String fieldString = String.join(", ", fieldNames);
+
+        // `?`를 필드명 개수만큼 반복해서 문자열을 구성합니다.
+        String placeholders = fieldNames.stream().map(s -> "?").collect(Collectors.joining(", "));
+
+        String insert_sql = String.format("INSERT INTO %s (%s) VALUES (%s)", tableName, fieldString, placeholders);
+        logger.info(insert_sql);
+        PreparedStatement stmt = conn.prepareStatement(insert_sql);
+
+        // MySQL Insert 처리
+        for( int i=0; i < fields.size(); i++){
+            int idx = i+1;
+            Schema.Field field = fields.get(i);
+            String fieldName = field.name();
+            String fieldType = field.schema().getType().name();
+            Object value = recordValue.get(fieldName);
+            stmt = setParameter(stmt, idx, value, fieldType);
+        }
+
+        int result = stmt.executeUpdate();
+        if(result > 0)
+            logger.info(String.format("record inserted successfuly... table: %s ", tableName));
+
+        return result;
     }
 
     public PreparedStatement setParameter(PreparedStatement stmt, int parameterIndex, Object value, String sqlType) throws SQLException {
