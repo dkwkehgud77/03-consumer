@@ -1,7 +1,6 @@
 package com.exam.worker;
 
 import io.confluent.kafka.serializers.KafkaAvroDeserializer;
-import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.TopicPartition;
@@ -9,12 +8,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.time.Duration;
-import java.util.*;
-import java.util.concurrent.*;
-import java.util.stream.Collectors;
+import java.util.Collections;
+import java.util.Map;
+import java.util.Properties;
+import java.util.ResourceBundle;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 public class AvroConsumer {
     private static final ResourceBundle RESOURCE_BUNDLE = ResourceBundle.getBundle("config");
@@ -22,24 +24,22 @@ public class AvroConsumer {
     private static final Logger logger = LoggerFactory.getLogger(AvroConsumer.class);
 
     // Kafka Consumer 설정
-    private String topicName;
-    private int partitionId;
-    private int partitionCount;
-    private String consumerGroupId;
-    private KafkaConsumer<String, GenericData.Record> consumer;
+    private final String topicName;
+    private final int partitionId;
+    private final int partitionCount;
+    private final String consumerGroupId;
+    private final KafkaConsumer<String, GenericData.Record> consumer;
     private Map<TopicPartition, OffsetAndMetadata> currentOffsets;
 
     // Backpressure 설정
     private final BlockingQueue<ConsumerRecord<String, GenericData.Record>> blockingQueue;
-    private int BLOCKING_QUEUE_SIZE = 1000;
-    private int MAX_POLL_RECORDS = 10;
-    private int POLL_INTERVAL_MS = 100;
+    private final int POLL_INTERVAL_MS;
 
     // MySQL 데이터베이스 작업
-    public MySQLConnectionPool dbPool = null;
-    private MySQLProcessData dbProcess = null;
+    public final MySQLConnectionPool dbPool;
+    private final MySQLProcessData dbProcess;
 
-    public AvroConsumer(String topicName, int partitionId, int partitionCount) throws SQLException {
+    public AvroConsumer(String topicName, int partitionId, int partitionCount) {
         // Topic 과 Partition 를 기준으로 고유한 컨슈머 객체 1개 생성 -> 1개의 스레드에 할당
         // 1개의 Partition 을 N개의 컨슈머가 구독하여도 성능은 좋아지지 않는다 -> 병렬 처리하지 않음
         // 1개의 Topic 의 N개의 Partition 에 N개의 컨슈머가 구독하면 성능은 개선된다 -> 병렬 처리함
@@ -49,16 +49,16 @@ public class AvroConsumer {
         this.consumerGroupId = "group-" + topicName;
 
         // Backpressure 관련 설정
-        this.BLOCKING_QUEUE_SIZE = Integer.parseInt(RESOURCE_BUNDLE.getString("blocking.queue.size"));
-        this.MAX_POLL_RECORDS = Integer.parseInt(RESOURCE_BUNDLE.getString("max.poll.records"));
+        int blockingQueueSize = Integer.parseInt(RESOURCE_BUNDLE.getString("blocking.queue.size"));
+        int maxPollRecords = Integer.parseInt(RESOURCE_BUNDLE.getString("max.poll.records"));
         this.POLL_INTERVAL_MS = Integer.parseInt(RESOURCE_BUNDLE.getString("poll.interval.ms"));
-        this.blockingQueue = new LinkedBlockingQueue<>(BLOCKING_QUEUE_SIZE);
+        this.blockingQueue = new LinkedBlockingQueue<>(blockingQueueSize);
 
         // Kafka 컨슈머 프로퍼티 설정 -> Consumer Group 메시지 병렬 처리, Avro 스키마 디시리얼라이즈, Exactly Once 보장 관련 설정
         Properties props = new Properties();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, RESOURCE_BUNDLE.getString("kafka.bootstrap.servers"));   // Kafka Broker 연결
         props.put(ConsumerConfig.GROUP_ID_CONFIG, consumerGroupId);             // Topic 을 기준으로 컨슈머 그룹 설정 - 메시지 병렬 처리
-        props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, MAX_POLL_RECORDS);    // 컨슈머가 한번에 가져올 수 있는 최대 레코드 수를 설정
+        props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, maxPollRecords);    // 컨슈머가 한번에 가져올 수 있는 최대 레코드 수를 설정
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");           // 컨슈머가 수동으로 커밋을 수행하도록 설정 - Exactly Once 보장
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");         // 파티션 offset 데이터가 DB에 없으면 처음부터 메시지 소비
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, KafkaAvroDeserializer.class.getName());     // Key 디시리얼라이즈 설정 - Avro 스키마
@@ -78,7 +78,7 @@ public class AvroConsumer {
         consumer.assign(Collections.singleton(partition));
 
         // 데이터베이스에서 컨슈머가 구독하고 있는 토픽-파티션의 Offset 값을 읽어옵니다.
-        // 프로그램은 정상/비정상 종료 후 재실행 시 데이터 유실없이 메시지를 소비하기 위함입니다. 
+        // 프로그램은 정상/비정상 종료 후 재실행 시 데이터 유실없이 메시지를 소비하기 위함입니다.
         Connection conn = dbPool.getConnection();
         currentOffsets = dbProcess.readOffsetsFromDB(conn, topicName, partitionId, consumerGroupId);
 
@@ -119,7 +119,7 @@ public class AvroConsumer {
 
             }
 
-            // 주기적으로 offset 정보를 외부 저장소에 저장
+            // 주기적으로 offset 정보를 외부 저장소(MySQL)에 저장합니다.
             dbProcess.saveOffsetToDB(conn, currentOffsets, consumerGroupId);
         }
 
@@ -146,10 +146,10 @@ public class AvroConsumer {
         conn.setAutoCommit(false);
         try {
 
-            // 해당 Record 를 Avro Schema 에 포함된 테이블 포맷에 맞게 동적으로 삽입 합니다.
+            // 해당 Record 의 Avro Schema 에 포함된 테이블 포맷에 맞게 동적으로 삽입 합니다.
             dbProcess.insertRecordToDB(conn, record);
 
-            // 현재 consumer에 대한 offset 정보를 업데이트해줌  -> +1 해줘야하는 건지
+            // 현재 consumer에 대한 offset 정보를 업데이트 합니다  -> +1 해줘야하는 건지?
             currentOffsets.put(new TopicPartition(record.topic(), record.partition()), new OffsetAndMetadata(record.offset() + 1));
 
             // 처리한 offset 정보를 데이터베이스 kafka_offset 테이블에 업데이트 합니다.
@@ -160,21 +160,17 @@ public class AvroConsumer {
 
         } catch (Exception e) {
             e.printStackTrace();
-            if (conn != null) {
-                try {
-                    // Exception 발생시 해당 커넥션 작업 롤백합니다. -> Exactly Once 보장
-                    conn.rollback();
-                } catch (SQLException ex) {
-                    ex.printStackTrace();
-                }
+            try {
+                // Exception 발생시 해당 커넥션 작업 롤백합니다. -> Exactly Once 보장
+                conn.rollback();
+            } catch (SQLException ex) {
+                ex.printStackTrace();
             }
             consumer.close();
         } finally {
-            if (conn != null) {
-                conn.close();
-                // 작업이 끝나면 MySQL 커넥션을 Connection Pool 에 반환합니다.
-                dbPool.returnConnection(conn);
-            }
+            conn.close();
+            // 작업이 끝나면 MySQL 커넥션을 Connection Pool 에 반환합니다.
+            dbPool.returnConnection(conn);
         }
     }
 

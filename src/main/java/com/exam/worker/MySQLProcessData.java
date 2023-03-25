@@ -21,7 +21,6 @@ class MySQLProcessData {
     private static final Logger logger = LoggerFactory.getLogger(MySQLProcessData.class);
 
     public MySQLConnectionPool createConnPool()  {
-        // MySQLConnectionPool 객체 생성
         MySQLConnectionPool dbPool = new MySQLConnectionPool(
                     RESOURCE_BUNDLE.getString("mysql.url"),
                     RESOURCE_BUNDLE.getString("mysql.username"),
@@ -30,23 +29,20 @@ class MySQLProcessData {
         return dbPool;
     }
 
-    public Connection getConnMySQL(MySQLConnectionPool dbPool) throws SQLException {
+    public Connection getConnMySQL(MySQLConnectionPool dbPool) {
         try {
             if(dbPool == null)
                 dbPool = createConnPool();
-            Connection conn = dbPool.getConnection();
-            return conn;
+            return dbPool.getConnection();
         } catch (SQLException ex) {
             throw new RuntimeException(ex);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
         }
     }
 
     public Map<TopicPartition, OffsetAndMetadata> readOffsetsFromDB(Connection conn, String topicName, int partitionId, String consumerGroupId){
         Map<TopicPartition, OffsetAndMetadata> offsets = new HashMap<>();
 
-        // DB에서 저장된 offset 정보를 읽어온다.
+        // DB 에서 컨슈머가 구독하고 있는 토픽-파티션의 Offset 값을 읽어옵니다.
         try {
             String query = String.format("SELECT * FROM kafka_offsets " +
                             "where topic='%s' and `partition`=%d and consumer_group='%s'" ,topicName, partitionId, consumerGroupId);
@@ -57,7 +53,6 @@ class MySQLProcessData {
             while (rs.next()) {
                 String topic = rs.getString("topic");
                 int partition = rs.getInt("partition");
-                String consumer_group = rs.getString("consumer_group");
                 long offset = rs.getLong("offset");
                 offsets.put(new TopicPartition(topic, partition), new OffsetAndMetadata(offset));
             }
@@ -68,6 +63,7 @@ class MySQLProcessData {
     }
 
     public void saveOffsetToDB(Connection conn, Map<TopicPartition, OffsetAndMetadata> offsets, String consumerGroupId) throws SQLException {
+        // 처리한 offset 정보를 데이터베이스 kafka_offset 테이블에 업데이트 합니다.
         String sql = "INSERT INTO kafka_offsets (offset, topic, `partition`, consumer_group)\n" +
                 "VALUES (?, ?, ?, ?)\n" +
                 "ON DUPLICATE KEY UPDATE\n" +
@@ -75,7 +71,6 @@ class MySQLProcessData {
                 "    topic = ?,\n" +
                 "    `partition` = ?,\n" +
                 "    consumer_group = ?";
-//            String sql = "UPDATE kafka_offsets SET offset = ? WHERE topic = ? AND `partition` = ?";
 
         PreparedStatement stmt = conn.prepareStatement(sql);
         for (Map.Entry<TopicPartition, OffsetAndMetadata> entry : offsets.entrySet()) {
@@ -97,6 +92,7 @@ class MySQLProcessData {
     }
 
     public int insertRecordToDB(Connection conn, ConsumerRecord<String, GenericData.Record> record) throws SQLException {
+        // 전달된 Record 의  Avro Schema 에 포함된 테이블 포맷에 맞게 동적으로 삽입 합니다.
         GenericData.Record recordValue =  record.value();
         Schema schema = recordValue.getSchema();
         String tableName = record.topic();
@@ -116,7 +112,7 @@ class MySQLProcessData {
         logger.info(insert_sql);
         PreparedStatement stmt = conn.prepareStatement(insert_sql);
 
-        // MySQL Insert 처리
+        // MySQL 테이블에 Kafka Record 를 삽입합니다.
         for( int i=0; i < fields.size(); i++){
             int idx = i+1;
             Schema.Field field = fields.get(i);
@@ -152,7 +148,9 @@ class MySQLProcessData {
                 return stmt;
 
             default:
-                throw new SQLException("Unknown SQL type: " + sqlType);
+                stmt.setObject(parameterIndex, value);
+                return stmt;
+//                throw new SQLException("Unknown SQL type: " + sqlType);
         }
 
     }

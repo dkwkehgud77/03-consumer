@@ -2,17 +2,10 @@ import com.exam.worker.AvroConsumer;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.DescribeTopicsResult;
-import org.apache.kafka.common.TopicPartitionInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.*;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -22,7 +15,7 @@ public class Main {
     private static final ResourceBundle RESOURCE_BUNDLE = ResourceBundle.getBundle("config");
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) {
 
         // AdminClient 설정을 구성하고, config.properties 에서 컨슈밍 할 Kafka 토픽을 가져옵니다.
         Properties properties = new Properties();
@@ -45,7 +38,7 @@ public class Main {
             throw new RuntimeException(e);
         }
 
-        // 모든 Topic 의 Partition 개수를 합한 만큼 스레드를 생성하는 Thread Pool 을 구성합니다.
+        // 모든 Topic 의 Partition 개수를 합한 만큼 Thread 를 생성하는 스레드 풀을 구성합니다.
         ExecutorService executor_topic = Executors.newFixedThreadPool(nThreads);
         for (Map.Entry<String, Integer> entry : topicPartitions.entrySet()) {
             String topicName = entry.getKey();
@@ -59,36 +52,16 @@ public class Main {
                     try {
                         AvroConsumer consumer = new AvroConsumer(topicName, partitionId, partitionCount);
                         consumer.consumeMesseages();
-                    } catch (SQLException e){
-                        e.printStackTrace();
-                        throw new RuntimeException(e);
+                        logger.info(String.format("kafka consumer started successfully.. topic: %s, patition: %s", topicName, partitionId));
+
                     } catch (Exception e){
                         e.printStackTrace();
+                        throw new RuntimeException(e);
                     }
                 });
             }
         }
+
     }
 }
 
-
-
-
-//    Properties props = new Properties();
-//        props.put("bootstrap.servers", "localhost:9091,localhost:9092,localhost:9093");
-//                props.put("group.id", "my-group");
-//                props.put("auto.offset.reset", "earliest");
-//                props.put("key.deserializer", "io.confluent.kafka.serializers.KafkaAvroDeserializer");
-//                props.put("value.deserializer", "io.confluent.kafka.serializers.KafkaAvroDeserializer");
-//                props.put("schema.registry.url", "http://localhost:8081");
-
-//        KafkaConsumer<String, GenericRecord> consumer = new KafkaConsumer<>(props);
-//        consumer.subscribe(Arrays.asList("dataset1", "dataset2", "dataset3"));
-
-
-//        while (true) {
-//            ConsumerRecords<String, GenericRecord> records = consumer.poll(Duration.ofMillis(100));
-//            for (ConsumerRecord<String, GenericRecord> record : records) {
-//                System.out.printf("key = %s, value = %s%n", record.key(), record.value());
-//            }
-//        }
