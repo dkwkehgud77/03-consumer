@@ -1,31 +1,41 @@
 
 # Kafka Consumer Application
 
-## Introduction
+### Introduction
 이 프로젝트는 대량의 Avro 형식의 메시지를 분산 병렬 처리하는 Java 기반 Kafka Consumer 애플리케이션입니다.
 이 애플리케이션은 장애 복구 시에도 데이터 유실 없이 Exactly-Once Delivery를 보장합니다.
 또한, Backpressure 기능을 지원하여 Consumer가 메시지를 처리하는 속도를 제어할 수 있습니다.
 
 
-## Features
-### Kafka 대량의 메시지 분산 병렬 처리
-- Kafka 토픽에 Partition의 개수만큼 Thread를 할당하여 메시지 분산 병렬 처리합니다.
-- 토픽 Partition 을 구독하고 있는 Thread를 컨슈머 Group 으로 묶어서 컨슈밍합니다. 
-- Thread에서 MySQL DB에 적재되는 작업은 비동기로 처리하여 처리 속도를 향상시킵니다. 
+### Features
+- Kafka Topic 멀티 파티션-스레드 대량의 메시지 분산 병렬 처리 
+- 장애 복구 시 데이터 유실 없이 Exactly-Once Delivery 보장
+- 블록킹 Queue 를 활용한 Backpressure 메시지 처리 속도 제어
+- Avro 스키마 디시리얼라이즈, 동적으로 SQL 생성 및 데이터 삽입 
 
-### 데이터 유실 없이 Exactly-Once Delivery 보장
-- MySQL 데이터 베이스에 Kafka의 Consumer Offset 정보를 저장하여 관리합니다.
-- Consumer 애플리케이션 재실행 시 MySQL에서 Offset을 읽어와서 메시지를 소비합니다.
-- Kafka-MySQL 구간에서 장애가 발생하면 트랜잭션을 rollback 처리하여 Exactly-Once를 보장합니다. 
+### Explanation
+#### Kafka Topic 멀티 파티션-스레드 대량의 메시지 분산 병렬 처리
+- 1개의 토픽의 N개의 파티션의 개수만큼 N개의 Thread 를 할당하여 메시지 분산 병렬 처리합니다.
+- 1개의 토픽의 N개의 파티션을 컨슈밍하고 있는 Thread 들을 1개의 컨슈머 그룹으로 지정합니다.  
+- Backpressure 기능을 위해 컨슈머 1개당 데이터베이스 처리하는 Thread 1개를 추가로 생성합니다. 
+- 1개의 토픽 > N개의 파티션 > N개의 컨슈머 Thread > N개의 DB처리 Thread 로 구성합니다. 
 
-### Backpressure 기능으로 메시지 처리하는 속도 제어
-- Kafka에서 컨슈밍한 메시지를 처리하기 전에 blocking queue 에 추가합니다. 
-- blocking queue 에서 꺼내어 MySQL DB에 적재되는 작업은 비동기로 처리합니다.
-- blocking queue 사이즈를 제한해두고 초과하면 Backpressure 가 작동합니다.
-- blocking queue 개수가 줄어들 때까지 Thread의 메시지 처리 작업을 대기하도록 합니다. 
+#### 장애 복구 시 데이터 유실 없이 Exactly-Once Delivery 보장
+- MySQL 데이터베이스에 Kafka 의 Consumer Offset 정보를 저장하여 관리합니다.
+- 애플리케이션 정상/비정상 종료 후 재실행 시 MySQL 에서 Offset 을 읽어와서 메시지를 소비합니다.
+- 1개의 파티션의 메시지를 처리하는 스레드를 1개로 제한하여 파티션의 메시지 처리 순서를 보장합니다.
+- Kafka-MySQL 구간에서 장애가 발생하면 트랜잭션을 rollback 하여 Exactly-Once 를 보장합니다. 
 
-### Avro 스키마 레지스트리를 활용한 메시지 디시리얼라이즈
-- Avro 스키마를 사용하여 Kafka Topic에서 가져온 데이터를 자바 객체로 디시리얼라이즈합니다.
+#### 블록킹 Queue 를 활용한 Backpressure 메시지 처리 속도 제어
+- Kafka 토픽을 구독하는 컨슈머 Thread 1개 당 DB처리 Thread 1개를 별도로 생성합니다.
+- 토픽에서 컨슈밍한 메시지를 처리하기 전에 블록킹 Queue 에 추가하고 바로 다음 메시지를 컨슈밍합니다.
+- DB처리 Thread 에서 메시지를 블록킹 Queue 에서 꺼내어 MySQL 에 처리하는 작업을 수행합니다. 
+- 블록킹 Queue 사이즈를 초과하면 Backpressure 기능이 작동하여 메시지 처리 속도를 제어합니다. 
+- 블록킹 Queue 개수가 줄어들 때까지 컨슈머 Thread 의 메시지 소비 작업을 대기하도록 합니다. 
+
+#### Avro 스키마 디시리얼라이즈, 동적으로 SQL 생성 및 데이터 삽입
+- Avro 스키마를 사용하여 Kafka 토픽에서 가져온 데이터를 Java 객체로 디시리얼라이즈합니다.
+- 레코드 객체에 포함된 Avro 스키마를 사용하여 동적으로 SQL 문을 작성하고, MySQL 테이블에 저장합니다.
 - Avro 스키마 레지스트리를 활용하여 스키마 및 버전을 관리하여 데이터 형식 변경에 유연하게 대처합니다. 
  
 
