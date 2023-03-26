@@ -16,6 +16,7 @@ public class Main {
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
 
     public static void main(String[] args) {
+        logger.info("kafka consumer application start...");
 
         // AdminClient 설정을 구성하고, config.properties 에서 컨슈밍 할 Kafka 토픽을 가져옵니다.
         Properties properties = new Properties();

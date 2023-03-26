@@ -63,6 +63,14 @@ mysql.maxPoolSize=50
 ```bash
 $ mvn clean compile
 $ mvn exec:java
+
+[INFO] --- compiler:3.1:compile (default-compile) @ consumer ---
+[INFO] Changes detected - recompiling the module!
+[INFO] Compiling 4 source files to /Users/dohyung/ailab/realtime-pipeline/03-consumer/target/classes
+[INFO] 
+[INFO] --- exec:3.0.0:java (default-cli) @ consumer ---
+[Main.main()] INFO Main - kafka consumer application start...
+
 ```
 
 ### Application Deployment
@@ -72,6 +80,11 @@ $ mvn exec:java
 ```bash
 $ mvn clean compile
 $ nohup java -jar target/consumer-1.0-jar-with-dependencies.jar &
+
+$ ps -ef |grep consumer 
+  501 17491 10912   0  2:24PM ttys020    0:09.51 /usr/bin/java -jar target/consumer-1.0-jar-with-dependencies.jar
+  501 17577 10912   0  2:25PM ttys020    0:00.00 grep consumer
+
 ```
 
 ### Application Stop
@@ -79,5 +92,7 @@ Mac이나 리눅스 기반의 OS에서는 Shell 파일을 이용해서 애플리
 ```bash
 $ chmod 755 start.sh stop.sh
 $ ./stop.sh
+
+[2]  - killed     nohup java -jar target/consumer-1.0-jar-with-dependencies.jar
 ```
 
