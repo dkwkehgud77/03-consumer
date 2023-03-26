@@ -1,7 +1,7 @@
 
 # Kafka Consumer Application
 
-### Introduction
+## Introduction
 이 프로젝트는 대량의 Avro 형식의 메시지를 분산 병렬 처리하는 Java 기반 Kafka Consumer 애플리케이션입니다.
 이 애플리케이션은 장애 복구 시에도 데이터 유실 없이 Exactly-Once Delivery를 보장합니다.
 또한, Backpressure 기능을 지원하여 Consumer가 메시지를 처리하는 속도를 제어할 수 있습니다.
