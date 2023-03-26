@@ -1,0 +1,1 @@
+pkill -9 -f 03-consumer

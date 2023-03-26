@@ -5,8 +5,8 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>org.example</groupId>
-    <artifactId>bank</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <artifactId>consumer</artifactId>
+    <version>1.0</version>
 
     <name>Kafka Consumer Application</name>
 
@@ -37,17 +37,11 @@
             <artifactId>avro</artifactId>
             <version>1.10.2</version>
         </dependency>
-        <!-- https://mvnrepository.com/artifact/io.confluent/kafka-avro-serializer -->
         <dependency>
             <groupId>io.confluent</groupId>
             <artifactId>kafka-avro-serializer</artifactId>
             <version>7.0.0</version>
         </dependency>
-<!--        <dependency>-->
-<!--            <groupId>io.confluent</groupId>-->
-<!--            <artifactId>kafka-schema-registry-client</artifactId>-->
-<!--        </dependency>-->
-
         <dependency>
             <groupId>org.apache.kafka</groupId>
             <artifactId>kafka-clients</artifactId>
@@ -58,7 +52,6 @@
             <artifactId>mysql-connector-java</artifactId>
             <version>8.0.23</version>
         </dependency>
-
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
@@ -70,7 +63,6 @@
             <version>1.7.32</version>
         </dependency>
     </dependencies>
-
 
     <build>
         <plugins>

@@ -85,7 +85,7 @@ class MySQLProcessData {
             stmt.setInt(7, tp.partition());
             stmt.setString(8, consumerGroupId);
 
-            logger.info(String.format("offsets updated successfuly... topic:%s partition:%d",tp.topic(), tp.partition()));
+            logger.debug(String.format("offsets updated successfuly... topic:%s partition:%d",tp.topic(), tp.partition()));
             stmt.executeUpdate();
         }
 
@@ -124,7 +124,7 @@ class MySQLProcessData {
 
         int result = stmt.executeUpdate();
         if(result > 0)
-            logger.info(String.format("record inserted successfuly... table: %s ", tableName));
+            logger.info(String.format("Record inserted successfuly... Table %s ", tableName));
 
         return result;
     }
