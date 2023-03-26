@@ -75,6 +75,7 @@ $ java -jar target/consumer-1.0-jar-with-dependencies.jar
 ```
 
 ### Application Stop
+Mac이나 리눅스 기반의 Os에서는 Shell 파일을 이용해서 애플리케이션을 실행하거나 중지할 수 있습니다.
 ```bash
 $ chmod 755 start.sh stop.sh
 $ ./stop.sh
