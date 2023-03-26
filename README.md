@@ -68,7 +68,7 @@ $ mvn exec:java
 ### Application Deployment
 1. properties 파일을 세팅합니다.
 2. Maven을 사용하여 프로젝트를 패키징합니다.
-3. Java로 jar파일을 샐행하여 Consumer 애플리케이션을 실행합니다. 
+3. Java를 사용하여 백그라운드로 Consumer 애플리케이션을 실행합니다. 
 ```bash
 $ mvn clean compile
 $ nohup java -jar target/consumer-1.0-jar-with-dependencies.jar &
