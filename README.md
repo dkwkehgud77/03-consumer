@@ -56,7 +56,7 @@ mysql.password=consumer1!
 mysql.maxPoolSize=50
 ```
 
-### Application Execution
+### Application Run
 1. properties 파일을 세팅합니다.
 2. Maven을 사용하여 프로젝트를 빌드합니다.
 3. Maven을 사용하여 Consumer 애플리케이션을 실행합니다. 
