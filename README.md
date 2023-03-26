@@ -4,7 +4,7 @@
 ### Introduction
 이 프로젝트는 대량의 Avro 형식의 메시지를 분산 병렬 처리하는 Java 기반 Kafka Consumer 애플리케이션입니다.
 Kafka 컨슈머는 정상/비정상 종료 후 재실행 시 데이터 유실 없이 Exactly-Once Delivery 를 보장합니다.
-또한, Backpressure 기능을 지원하여 블록킹 Queue 를 통해 컨슈머가 메시지 처리 속도를 제어할 수 있습니다.
+또한, Backpressure 기능을 지원하여 블록킹 Queue 를 통해 컨슈머가 메시지 처리 속도를 제어할 수 있습니다. 
 이를 통해 대량의 데이터 처리와 트래픽에 대응할 수 있는 안정적인 실시간 데이터 파이프라인을 제공합니다.
 
 
