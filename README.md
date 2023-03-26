@@ -71,7 +71,7 @@ $ mvn exec:java
 3. Java로 jar파일을 샐행하여 Consumer 애플리케이션을 실행합니다. 
 ```bash
 $ mvn clean compile
-$ java -jar target/consumer-1.0-jar-with-dependencies.jar
+$ nohup java -jar target/consumer-1.0-jar-with-dependencies.jar &
 ```
 
 ### Application Stop
