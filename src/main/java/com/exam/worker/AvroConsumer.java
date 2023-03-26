@@ -130,8 +130,7 @@ public class AvroConsumer {
                     // blockingQueue 가 가득차면 Backpressure 가 작동합니다.
                     handleBackpressure(record);
                 }
-                logger.info(String.format("blockingQueue size: %d, max size: %d by Topic %s partition %d",
-                        blockingQueue.size(), BLOCKING_QUEUE_SIZE, topicName, partitionId));
+                logger.info(String.format("blockingQueue size: %d, max size: %d", blockingQueue.size(), BLOCKING_QUEUE_SIZE));
 
             }
             // 주기적으로 offset 정보를 외부 저장소(MySQL)에 저장합니다.

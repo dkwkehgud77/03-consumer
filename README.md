@@ -3,8 +3,9 @@
 
 ### Introduction
 이 프로젝트는 대량의 Avro 형식의 메시지를 분산 병렬 처리하는 Java 기반 Kafka Consumer 애플리케이션입니다.
-이 애플리케이션은 장애 복구 시에도 데이터 유실 없이 Exactly-Once Delivery를 보장합니다.
-또한, Backpressure 기능을 지원하여 Consumer가 메시지를 처리하는 속도를 제어할 수 있습니다.
+Kafka 컨슈머는 정상/비정상 종료 후 재실행 시 데이터 유실 없이 Exactly-Once Delivery 를 보장합니다.
+또한, Backpressure 기능을 지원하여 블록킹 Queue 를 통해 컨슈머가 메시지 처리 속도를 제어할 수 있습니다.
+이를 통해 대량의 데이터 처리와 트래픽에 대응할 수 있는 안정적인 실시간 데이터 파이프라인을 제공합니다.
 
 
 ### Features
@@ -80,7 +81,6 @@ $ mvn exec:java
 [INFO] 
 [INFO] --- exec:3.0.0:java (default-cli) @ consumer ---
 [Main.main()] INFO Main - kafka consumer application start...
-
 ```
 
 ### Application Deploy
@@ -106,3 +106,61 @@ $ ./stop.sh
 [2]  - killed     nohup java -jar target/consumer-1.0-jar-with-dependencies.jar
 ```
 
+### Exactly Once
+```bash
+1. Consumer 애플리케이션이 실행되고 있는 상태에서, Producer 애플리케이션을 실행한다. 
+2. Producer 가 대량의 메시지를 생산하고, Consumer 애플리케이션 메시지를 처리하기 시작한다.   
+3. 메시지가 처리하고 있는 도중에 Consumer 애플리케이션을 중지시킨다. -> 장애상황이라고 가정
+4. Consumer 애플리케이션 재시작하고 나서, 모든 메시지가 처리되기 까지 대기한다. 
+5. Kafka 토픽 파티션의 offset과 MySQL kafka_offsets 테이블을 비교한다.
+6. 장애 복구 후에도 데이터 유실 없이 Exactly Once가 보장되는지 데이터 정합성을 확인한다. 
+
+# Consumer Stop
+$ pkill -9 -f consumer
+
+# Kafka UI
+http://localhost:9000/topic/dataset1
+http://localhost:9000/topic/dataset2
+http://localhost:9000/topic/dataset3
+
+# MySQL Console
+mysql> select * from kafka_offsets;
++----------+-----------+----------------+--------+
+| topic    | partition | consumer_group | offset |
++----------+-----------+----------------+--------+
+| dataset1 |         0 | group-dataset1 |   1013 |
+| dataset1 |         1 | group-dataset1 |    992 |
+| dataset1 |         2 | group-dataset1 |    995 |
+| dataset2 |         0 | group-dataset2 |   1052 |
+| dataset2 |         1 | group-dataset2 |   1002 |
+| dataset2 |         2 | group-dataset2 |    946 |
+| dataset3 |         0 | group-dataset3 |   1041 |
+| dataset3 |         1 | group-dataset3 |   1003 |
+| dataset3 |         2 | group-dataset3 |    956 |
++----------+-----------+----------------+--------+
+9 rows in set (0.03 sec)
+
+```
+
+### Backpressure
+```bash
+# Consumer 애플리케이션을 패키징하여 백드라운드로 실행시킨다. 
+$ cd ./03-consumer
+$ mvn clean package
+$ nohup java -jar target/consumer-1.0-jar-with-dependencies.jar &
+$ ps -ef |grep consumer
+  501 51542     1   0  7:59PM ttys023    0:11.92 /usr/bin/java -jar target/consumer-1.0-jar-with-dependencies.jar
+  501 51561 16576   0  7:59PM ttys023    0:00.00 grep consumer
+
+# 아래의 경고 메시지가 로그에 찍히면 블록킹 Queue 의 사이즈를 초과하였다는 의미이고,
+# Backpressure 를 작동하여 메시지 처리 속도를 제어하고 있는 것을 확인할 수 있다.  
+$ tail -f nohup.out| grep WARN
+[pool-1-thread-4] WARN com.exam.worker.AvroConsumer - Backpressure activated and message processing stopped...
+[pool-1-thread-9] WARN com.exam.worker.AvroConsumer - Backpressure activated and message processing stopped...
+[pool-1-thread-1] WARN com.exam.worker.AvroConsumer - Backpressure activated and message processing stopped...
+[pool-1-thread-4] WARN com.exam.worker.AvroConsumer - Backpressure has been resolved. Resuming message processing...
+[pool-1-thread-9] WARN com.exam.worker.AvroConsumer - Backpressure has been resolved. Resuming message processing...
+[pool-1-thread-4] WARN com.exam.worker.AvroConsumer - Backpressure activated and message processing stopped...
+[pool-1-thread-3] WARN com.exam.worker.AvroConsumer - Backpressure activated and message processing stopped...
+[pool-1-thread-1] WARN com.exam.worker.AvroConsumer - Backpressure has been resolved. Resuming message processing...
+```
