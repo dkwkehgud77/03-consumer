@@ -19,7 +19,7 @@
 - Kafka-MySQL 구간에서 장애가 발생하면 트랜잭션을 rollback 처리하여 Exactly-Once를 보장합니다. 
 
 ### Backpressure 기능으로 메시지 처리하는 속도 제어
-- Kafka에서 컨슈밍한 메시지를 처리하기 전에 blocking queue 에 담습니다.
+- Kafka에서 컨슈밍한 메시지를 처리하기 전에 blocking queue 에 추가합니다. 
 - blocking queue 에서 꺼내어 MySQL DB에 적재되는 작업은 비동기로 처리합니다.
 - blocking queue 사이즈를 제한해두고 초과하면 Backpressure 가 작동합니다.
 - blocking queue 개수가 줄어들 때까지 Thread의 메시지 처리 작업을 대기하도록 합니다. 
@@ -73,7 +73,7 @@ $ mvn exec:java
 
 ```
 
-### Application Deployment
+### Application Deploy
 1. properties 파일을 세팅합니다.
 2. Maven을 사용하여 프로젝트를 패키징합니다.
 3. Java를 사용하여 백그라운드로 Consumer 애플리케이션을 실행합니다. 

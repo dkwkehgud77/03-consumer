@@ -85,7 +85,7 @@ class MySQLProcessData {
             stmt.setInt(7, tp.partition());
             stmt.setString(8, consumerGroupId);
 
-            logger.debug(String.format("offsets updated successfuly... topic:%s partition:%d",tp.topic(), tp.partition()));
+//            logger.debug(String.format("offsets updated successfuly... topic:%s partition:%d",tp.topic(), tp.partition()));
             stmt.executeUpdate();
         }
 
@@ -109,7 +109,7 @@ class MySQLProcessData {
         String placeholders = fieldNames.stream().map(s -> "?").collect(Collectors.joining(", "));
 
         String insert_sql = String.format("INSERT INTO %s (%s) VALUES (%s)", tableName, fieldString, placeholders);
-        logger.info(insert_sql);
+//        logger.info(insert_sql);
         PreparedStatement stmt = conn.prepareStatement(insert_sql);
 
         // MySQL 테이블에 Kafka Record 를 삽입합니다.
@@ -123,8 +123,8 @@ class MySQLProcessData {
         }
 
         int result = stmt.executeUpdate();
-        if(result > 0)
-            logger.info(String.format("Record inserted successfuly... Table %s ", tableName));
+//        if(result > 0)
+//            logger.info(String.format("Record inserted successfuly... Table %s ", tableName));
 
         return result;
     }
